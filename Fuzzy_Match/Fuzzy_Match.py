@@ -93,7 +93,7 @@ class Fuzzy_Match:
         if self.weight is not None:
             self.query_tf_idf = self.weight.transform(self.query_tf_idf)
 
-        if scipy.sparse.isparse(self.query_tf_idf):
+        if scipy.sparse.issparse(self.query_tf_idf):
             norm_q = scipy.sparse.linalg.norm(self.query_tf_idf, axis=1)
             norm_q[norm_q.nonzero()] += np.finfo(float).eps
             norm_c = scipy.sparse.linalg.norm(self.corpus_tf_idf, axis=1)  
