@@ -5,14 +5,11 @@ from collections import namedtuple
 import re
 
 class _Weight():
-    def fit(self, X, y=None, reg=1):
-        if y is not None:
-            self.reg = reg
-            ATA = X.T @ X
-            B = (X.T @ y).todense()
-            self.weight = np.linalg.solve(ATA + self.reg * np.identity(ATA.shape[0]), B)
-        else:
-            self.weight = np.identity(X.shape[1])
+    def fit(self, X, y, reg=1):
+        self.reg = reg
+        ATA = X.T @ X
+        B = (X.T @ y).todense()
+        self.weight = np.linalg.solve(ATA + self.reg * np.identity(ATA.shape[0]), B)
 
     def transform(self, X, y=None):
         return np.asarray(X @ self.weight)
@@ -66,17 +63,15 @@ class Fuzzy_Match:
         self.corpus_tf_idf = self.vectorizer.transform(self.corpus)
  
         self.valid_matches = valid_matches
-        self.weight = _Weight()
-
         if self.valid_matches is not None:
+            self.weight = _Weight()
             queries, mapped = valid_matches
             queries = self.vectorizer.transform(queries)
             mapped = self.vectorizer.transform(mapped)
             self.weight.fit(queries, mapped, reg)
+            self.corpus_tf_idf = self.weight.transform(self.corpus_tf_idf)
         else:
-            self.weight.fit(self.corpus_tf_idf)
-
-        self.corpus_tf_idf = self.weight.transform(self.corpus_tf_idf)
+            self.weight = None
 
 
     def search(self, query, top_n=5):
@@ -92,7 +87,10 @@ class Fuzzy_Match:
             Dicionary of {query : [list of top_n matches (sorted by similarity score, desc)]}
         """
         self.query = np.array([query]) if type(query) == str else np.array(query)
-        self.query_tf_idf = self.weight.transform(self.vectorizer.transform(self.query))
+        self.query_tf_idf = self.vectorizer.transform(self.query)
+
+        if self.weight is not None:
+            self.query_tf_idf = self.weight.transform(self.query_tf_idf)
         
         norm_q = np.linalg.norm(self.query_tf_idf, axis=1, keepdims=True)
         norm_q[norm_q == 0] = np.finfo(float).eps
