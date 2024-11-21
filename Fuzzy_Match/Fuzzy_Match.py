@@ -1,4 +1,5 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
+import scipy.sparse
 import numpy as np
 import re
 from collections import namedtuple
@@ -91,13 +92,19 @@ class Fuzzy_Match:
 
         if self.weight is not None:
             self.query_tf_idf = self.weight.transform(self.query_tf_idf)
-        
-        norm_q = np.linalg.norm(self.query_tf_idf, axis=1, keepdims=True)
-        norm_q[norm_q == 0] = np.finfo(float).eps
-        norm_c = np.linalg.norm(self.corpus_tf_idf, axis=1, keepdims=True)  
-        norm_c[norm_c == 0] = np.finfo(float).eps
-        distances = (self.query_tf_idf @ self.corpus_tf_idf.T) / (norm_q.dot(norm_c.T))
 
+        if scipy.sparse.isparse(self.query_tf_idf):
+            norm_q = scipy.sparse.linalg.norm(self.query_tf_idf, axis=1)
+            norm_q[norm_q.nonzero()] += np.finfo(float).eps
+            norm_c = scipy.sparse.linalg.norm(self.corpus_tf_idf, axis=1)  
+            norm_c[norm_c.nonzero()] += np.finfo(float).eps
+        else:
+            norm_q = np.linalg.norm(self.query_tf_idf, axis=1, keepdims=True)
+            norm_q[norm_q == 0] = np.finfo(float).eps
+            norm_c = np.linalg.norm(self.corpus_tf_idf, axis=1, keepdims=True)  
+            norm_c[norm_c == 0] = np.finfo(float).eps
+        
+        distances = (self.query_tf_idf @ self.corpus_tf_idf.T) / (norm_q.dot(norm_c.T))
         indices = distances.argsort()[:,::-1][:,:top_n]
         result = namedtuple('result', ['matches', 'scores'], defaults = [None, None])
         matches = {self.query[i] : result(self.corpus[idx], distances[i, idx]) for i, idx in enumerate(indices)}
